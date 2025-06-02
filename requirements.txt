@@ -17,7 +17,7 @@ spacy==3.8.7
 networkx==3.5
 uvicorn==0.34.3
 fastapi==0.115.12
-pyttsx3
+gTTS
 ollama
 sqlalchemy
 pydantic

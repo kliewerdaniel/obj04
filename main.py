@@ -41,6 +41,9 @@ app.include_router(graph_router, prefix="/api/graph")
 # Serve static files (e.g. your graph.html page)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# Mount the static audio directory
+app.mount("/static/audio", StaticFiles(directory="static/audio"), name="audio")
+
 @app.get("/graph")
 def serve_graph_page():
     return FileResponse("static/graph.html")

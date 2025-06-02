@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import List
 import ollama
@@ -9,13 +9,21 @@ from .schemas import BroadcastResponse  # adjust to your project structure
 from .database import get_db  # your database session dependency
 from .crud import generate_broadcast_content  # adjust to your project structure
 from datetime import datetime
+from modules.tts import generate_audio
 router = APIRouter()
 
 class BroadcastResponse(BaseModel):
     broadcast: str
+    audio_url: str | None = None
+
+class AudioResponse(BaseModel):
+    audio_url: str
 
 class ArticleSummariesResponse(BaseModel):
     summary: List[str]
+
+class AudioGenerationRequest(BaseModel):
+    text: str
 
 @router.get("/summaries", response_model=ArticleSummariesResponse)
 def get_article_summaries(db: Session = Depends(get_db)):
@@ -39,12 +47,7 @@ def generate_broadcast(db: Session = Depends(get_db)):
 
 Produce the final result as a polished, ready-to-air news broadcast script.
 
-Formate the broadcast as follows:
-    Title: [Broadcast Title]
-    Date: [Current Date]
-    Time: [Current Time]
-
-    [News Broadcast Content]
+Output only the text of the news broadcast with no symbols or text introducing or concluding the output.
 
     Here are the summaries to work with:
 
@@ -56,3 +59,15 @@ Formate the broadcast as follows:
 
     news_broadcast = response['message']['content']
     return {"broadcast": news_broadcast}
+
+@router.post("/generate_audio", response_model=AudioResponse)
+def generate_audio_endpoint(request: AudioGenerationRequest):
+    try:
+        # Generate a unique filename based on timestamp
+        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+        filename = f"broadcast_{timestamp}.mp3"
+        audio_path = generate_audio(request.text, filename)
+        # Return the URL relative to the static directory
+        return {"audio_url": f"/static/audio/{filename}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Audio generation failed: {str(e)}")

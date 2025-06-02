@@ -23,6 +23,10 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
+      '/static': { // Add proxy for static files
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+      },
     },
   },
 });

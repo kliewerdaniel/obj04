@@ -5,12 +5,14 @@ interface NewsEntry {
   timestamp: string;
   broadcast: string;
   summaries: string[];
+  audio_url?: string; // Optional audio URL
 }
 
 export default function NewsBroadcast() {
   const [savedBroadcasts, setSavedBroadcasts] = useState<NewsEntry[]>([]);
   const [selectedBroadcast, setSelectedBroadcast] = useState<NewsEntry | null>(null);
   const [loading, setLoading] = useState(false);
+  const [audioLoading, setAudioLoading] = useState(false); // New state for audio loading
   const [error, setError] = useState<string | null>(null);
 
   const isInitialMount = useRef(true);
@@ -108,6 +110,54 @@ export default function NewsBroadcast() {
     }
   };
 
+  const handleGenerateAudio = async () => {
+    if (!selectedBroadcast || !selectedBroadcast.broadcast) {
+      setError("No broadcast selected or broadcast text is empty.");
+      return;
+    }
+
+    setAudioLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/generate_audio', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text: selectedBroadcast.broadcast }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const audioUrl = data.audio_url;
+      console.log('Received audioUrl from API:', audioUrl); // Add this log
+
+      // Update the selected broadcast with the new audio URL
+      setSelectedBroadcast(prev => {
+        if (prev) {
+          const updatedBroadcast = { ...prev, audio_url: audioUrl };
+          console.log('Updating selectedBroadcast state with:', updatedBroadcast); // Add this log
+          // Also update in savedBroadcasts
+          setSavedBroadcasts(currentSaved =>
+            currentSaved.map(b => (b.id === updatedBroadcast.id ? updatedBroadcast : b))
+          );
+          return updatedBroadcast;
+        }
+        return null;
+      });
+
+    } catch (err: any) {
+      console.error("Error generating audio:", err);
+      setError(`Failed to generate audio: ${err.message}`);
+    } finally {
+      setAudioLoading(false);
+    }
+  };
+
   return (
     <div className="p-6 max-w-3xl mx-auto">
       <h1 className="text-3xl font-bold mb-4">Objective News Broadcast</h1>
@@ -122,6 +172,7 @@ export default function NewsBroadcast() {
 
       {error && <p className="text-red-500">{error}</p>}
       {loading && <p>Generating broadcast and summaries...</p>}
+      {audioLoading && <p>Generating audio...</p>}
 
       <h2 className="text-2xl font-bold mt-8 mb-4">Saved Broadcasts</h2>
       {savedBroadcasts.length === 0 ? (
@@ -159,7 +210,32 @@ export default function NewsBroadcast() {
         <div className="mt-8 p-6 border rounded-lg shadow-lg bg-white">
           <h2 className="text-2xl font-bold mb-4">Broadcast Details ({selectedBroadcast.timestamp})</h2>
           {selectedBroadcast.broadcast ? (
-            <p className="whitespace-pre-line text-lg">{selectedBroadcast.broadcast}</p>
+            <>
+              <p className="whitespace-pre-line text-lg">{selectedBroadcast.broadcast}</p>
+              <div className="mt-4 flex items-center space-x-4">
+                <button
+                  onClick={handleGenerateAudio}
+                  className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded"
+                  disabled={audioLoading || !selectedBroadcast.broadcast}
+                >
+                  {audioLoading ? 'Generating Audio...' : 'Generate Audio'}
+                </button>
+                {selectedBroadcast.audio_url && (
+                  <>
+                    <audio controls src={selectedBroadcast.audio_url} className="w-full max-w-xs">
+                      Your browser does not support the audio element.
+                    </audio>
+                    <a
+                      href={selectedBroadcast.audio_url}
+                      download={`broadcast_${selectedBroadcast.id}.mp3`}
+                      className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+                    >
+                      Download Audio
+                    </a>
+                  </>
+                )}
+              </div>
+            </>
           ) : (
             <p>No broadcast text available for this entry.</p>
           )}
