@@ -22,3 +22,4 @@ ollama
 sqlalchemy
 pydantic
 requests
+edge-tts

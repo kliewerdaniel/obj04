@@ -68,6 +68,56 @@ export default function NewsBroadcast() {
     }
   }, [selectedBroadcast]);
 
+  const handleGenerateAudio = async (broadcastText?: string) => {
+    const textToGenerate = broadcastText || selectedBroadcast?.broadcast;
+
+    if (!textToGenerate) {
+      setError("No broadcast text available for audio generation.");
+      return;
+    }
+
+    setAudioLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch('/api/generate_audio', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ text: textToGenerate }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      const audioUrl = data.audio_url;
+      console.log('Received audioUrl from API:', audioUrl);
+
+      // Update the selected broadcast with the new audio URL
+      setSelectedBroadcast(prev => {
+        if (prev) {
+          const updatedBroadcast = { ...prev, audio_url: audioUrl };
+          console.log('Updating selectedBroadcast state with:', updatedBroadcast);
+          // Also update in savedBroadcasts
+          setSavedBroadcasts(currentSaved =>
+            currentSaved.map(b => (b.id === updatedBroadcast.id ? updatedBroadcast : b))
+          );
+          return updatedBroadcast;
+        }
+        return null;
+      });
+
+    } catch (err: any) {
+      console.error("Error generating audio:", err);
+      setError(`Failed to generate audio: ${err.message}`);
+    } finally {
+      setAudioLoading(false);
+    }
+  };
+
   const handleGenerate = async () => {
     setLoading(true);
     setError(null);
@@ -95,6 +145,9 @@ export default function NewsBroadcast() {
       setSavedBroadcasts(prev => [...prev, newEntry]);
       setSelectedBroadcast(newEntry); // Automatically select the newly generated broadcast
 
+      // Automatically generate audio after broadcast is generated and selected
+      await handleGenerateAudio(newEntry.broadcast);
+
     } catch (err: any) {
       console.error("Error generating news content:", err);
       setError(`Failed to generate news content: ${err.message}`);
@@ -107,54 +160,6 @@ export default function NewsBroadcast() {
     setSavedBroadcasts(prev => prev.filter(entry => entry.id !== id));
     if (selectedBroadcast?.id === id) {
       setSelectedBroadcast(null); // Deselect if the deleted one was selected
-    }
-  };
-
-  const handleGenerateAudio = async () => {
-    if (!selectedBroadcast || !selectedBroadcast.broadcast) {
-      setError("No broadcast selected or broadcast text is empty.");
-      return;
-    }
-
-    setAudioLoading(true);
-    setError(null);
-
-    try {
-      const response = await fetch('/api/generate_audio', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ text: selectedBroadcast.broadcast }),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const audioUrl = data.audio_url;
-      console.log('Received audioUrl from API:', audioUrl); // Add this log
-
-      // Update the selected broadcast with the new audio URL
-      setSelectedBroadcast(prev => {
-        if (prev) {
-          const updatedBroadcast = { ...prev, audio_url: audioUrl };
-          console.log('Updating selectedBroadcast state with:', updatedBroadcast); // Add this log
-          // Also update in savedBroadcasts
-          setSavedBroadcasts(currentSaved =>
-            currentSaved.map(b => (b.id === updatedBroadcast.id ? updatedBroadcast : b))
-          );
-          return updatedBroadcast;
-        }
-        return null;
-      });
-
-    } catch (err: any) {
-      console.error("Error generating audio:", err);
-      setError(`Failed to generate audio: ${err.message}`);
-    } finally {
-      setAudioLoading(false);
     }
   };
 
@@ -214,7 +219,7 @@ export default function NewsBroadcast() {
               <p className="whitespace-pre-line text-lg">{selectedBroadcast.broadcast}</p>
               <div className="mt-4 flex items-center space-x-4">
                 <button
-                  onClick={handleGenerateAudio}
+                  onClick={() => handleGenerateAudio()} // Now calls without argument, uses selectedBroadcast
                   className="bg-purple-500 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded"
                   disabled={audioLoading || !selectedBroadcast.broadcast}
                 >

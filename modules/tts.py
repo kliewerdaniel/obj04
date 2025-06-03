@@ -1,47 +1,46 @@
-from gtts import gTTS
+import edge_tts
+import asyncio
 import os
 import logging
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def generate_audio(text: str, output_filename: str = "broadcast_audio.mp3"):
+async def generate_audio_edge(text: str, output_filename: str = "broadcast_audio.mp3") -> str:
     """
-    Generates speech audio from text using gTTS and saves it to a file.
+    Asynchronously generates speech audio from text using Edge TTS and saves it to a file.
     """
     output_dir = "static/audio"
     os.makedirs(output_dir, exist_ok=True)
     output_path = os.path.join(output_dir, output_filename)
 
-    logging.info(f"Attempting to generate audio for text (first 50 chars): '{text[:50]}...'")
+    logging.info(f"Generating audio for text (first 50 chars): '{text[:50]}...'")
     logging.info(f"Output path: {output_path}")
 
     try:
-        tts = gTTS(text=text, lang='en', slow=False)
-        tts.save(output_path)
-        
-        # Verify file size
-        if os.path.exists(output_path):
-            file_size = os.path.getsize(output_path)
-            if file_size > 0:
-                logging.info(f"Audio generated successfully. File size: {file_size} bytes.")
-                return output_path
-            else:
-                logging.error(f"Generated audio file is empty: {output_path}")
-                raise Exception("Generated audio file is empty.")
+        communicate = edge_tts.Communicate(text, voice="en-US-JennyNeural")
+        await communicate.save(output_path)
+
+        if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
+            logging.info(f"Audio generated successfully: {output_path}")
+            return output_path
         else:
-            logging.error(f"Audio file was not created at: {output_path}")
-            raise Exception("Audio file was not created.")
-            
+            logging.error("Audio generation failed or file is empty.")
+            raise Exception("Audio file was not created or is empty.")
     except Exception as e:
-        logging.error(f"Error generating audio with gTTS: {e}", exc_info=True)
+        logging.error(f"Error generating audio with edge-tts: {e}", exc_info=True)
         raise
 
+def generate_audio(text: str, output_filename: str = "broadcast_audio.mp3") -> str:
+    """
+    Synchronous wrapper for the async Edge TTS generator.
+    """
+    return asyncio.run(generate_audio_edge(text, output_filename))
+
 if __name__ == "__main__":
-    # Example usage
     sample_text = "This is a test broadcast. The news of the day is very important."
     try:
         generated_file = generate_audio(sample_text)
         print(f"Audio generated and saved to: {generated_file}")
     except Exception as e:
-        print(f"Failed to generate audio in example: {e}")
+        print(f"Failed to generate audio: {e}")
